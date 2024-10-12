@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:async';
 
 // Card Model
 class CardModel {
@@ -7,18 +8,22 @@ class CardModel {
   final String frontDesign;
   final String backDesign;
   bool isFaceUp;
+  bool isMatched;
 
   CardModel({
     required this.id,
     required this.frontDesign,
     required this.backDesign,
     this.isFaceUp = false, // Initially face-down
+    this.isMatched = false, // Initially not matched
   });
 }
 
 // Game Provider (State Management)
 class GameProvider with ChangeNotifier {
   List<CardModel> _cards = [];
+  CardModel? _firstFlippedCard;
+  bool _isCheckingMatch = false;
 
   List<CardModel> get cards => _cards;
 
@@ -27,7 +32,6 @@ class GameProvider with ChangeNotifier {
   }
 
   void _initializeCards() {
-    // Create pairs of cards for the game (e.g., 4 pairs for 4x4 grid)
     _cards = List.generate(8, (index) {
       return [
         CardModel(
@@ -47,8 +51,44 @@ class GameProvider with ChangeNotifier {
   }
 
   void flipCard(CardModel card) {
-    card.isFaceUp = !card.isFaceUp;
+    // Prevent flipping during match check or if the card is already face-up
+    if (_isCheckingMatch || card.isFaceUp || card.isMatched) return;
+
+    card.isFaceUp = true;
     notifyListeners();
+
+    // Check if this is the first or second flipped card
+    if (_firstFlippedCard == null) {
+      _firstFlippedCard = card;
+    } else {
+      _isCheckingMatch = true;
+      _checkForMatch(card);
+    }
+  }
+
+  void _checkForMatch(CardModel secondCard) {
+    if (_firstFlippedCard != null &&
+        _firstFlippedCard!.frontDesign == secondCard.frontDesign) {
+      // Match found: Keep both cards face-up and mark as matched
+      _firstFlippedCard!.isMatched = true;
+      secondCard.isMatched = true;
+
+      // Reset for the next round
+      _firstFlippedCard = null;
+      _isCheckingMatch = false;
+      notifyListeners();
+    } else {
+      // No match: Flip both cards back down after a delay
+      Future.delayed(const Duration(seconds: 1), () {
+        _firstFlippedCard!.isFaceUp = false;
+        secondCard.isFaceUp = false;
+
+        // Reset for the next round
+        _firstFlippedCard = null;
+        _isCheckingMatch = false;
+        notifyListeners();
+      });
+    }
   }
 }
 
