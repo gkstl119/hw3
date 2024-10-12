@@ -108,18 +108,74 @@ class GameScreen extends StatelessWidget {
   }
 }
 
-// Card Widget
-class CardWidget extends StatelessWidget {
+// Card Widget with Animation and Text Fix
+class CardWidget extends StatefulWidget {
   final CardModel card;
 
   const CardWidget({Key? key, required this.card}) : super(key: key);
 
   @override
+  _CardWidgetState createState() => _CardWidgetState();
+}
+
+class _CardWidgetState extends State<CardWidget>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+
+    _animation = Tween<double>(begin: 0, end: 1).animate(_controller);
+  }
+
+  @override
+  void didUpdateWidget(covariant CardWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.card.isFaceUp) {
+      _controller.forward();
+    } else {
+      _controller.reverse();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        Provider.of<GameProvider>(context, listen: false).flipCard(card);
+        Provider.of<GameProvider>(context, listen: false).flipCard(widget.card);
       },
+      child: AnimatedBuilder(
+        animation: _animation,
+        builder: (context, child) {
+          final isUnder = _animation.value > 0.5;
+          return Transform(
+            transform: Matrix4.identity()
+              ..setEntry(3, 2, 0.001) // Perspective effect
+              ..rotateY(_animation.value * 3.14), // Rotate the card
+            alignment: Alignment.center,
+            child: isUnder ? _buildFrontCard() : _buildBackCard(),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildFrontCard() {
+    return Transform(
+      transform: Matrix4.identity()..rotateY(3.14), // Corrects the flipped text
+      alignment: Alignment.center,
       child: Container(
         decoration: BoxDecoration(
           color: Colors.blue,
@@ -127,9 +183,24 @@ class CardWidget extends StatelessWidget {
         ),
         child: Center(
           child: Text(
-            card.isFaceUp ? card.frontDesign : card.backDesign,
-            style: const TextStyle(color: Colors.white),
+            widget.card.frontDesign,
+            style: const TextStyle(color: Colors.white, fontSize: 20),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBackCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey,
+        borderRadius: BorderRadius.circular(8.0),
+      ),
+      child: const Center(
+        child: Text(
+          'Card Back',
+          style: TextStyle(color: Colors.white, fontSize: 20),
         ),
       ),
     );
