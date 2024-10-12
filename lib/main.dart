@@ -24,8 +24,10 @@ class GameProvider with ChangeNotifier {
   List<CardModel> _cards = [];
   CardModel? _firstFlippedCard;
   bool _isCheckingMatch = false;
+  bool _hasWon = false;
 
   List<CardModel> get cards => _cards;
+  bool get hasWon => _hasWon;
 
   GameProvider() {
     _initializeCards();
@@ -51,8 +53,8 @@ class GameProvider with ChangeNotifier {
   }
 
   void flipCard(CardModel card) {
-    // Prevent flipping during match check or if the card is already face-up
-    if (_isCheckingMatch || card.isFaceUp || card.isMatched) return;
+    // Prevent flipping during match check, if card is already face-up, or if game is won
+    if (_isCheckingMatch || card.isFaceUp || card.isMatched || _hasWon) return;
 
     card.isFaceUp = true;
     notifyListeners();
@@ -72,6 +74,7 @@ class GameProvider with ChangeNotifier {
       // Match found: Keep both cards face-up and mark as matched
       _firstFlippedCard!.isMatched = true;
       secondCard.isMatched = true;
+      _checkForWin();
 
       // Reset for the next round
       _firstFlippedCard = null;
@@ -89,6 +92,22 @@ class GameProvider with ChangeNotifier {
         notifyListeners();
       });
     }
+  }
+
+  void _checkForWin() {
+    // Check if all cards are matched
+    if (_cards.every((card) => card.isMatched)) {
+      _hasWon = true;
+      notifyListeners();
+    }
+  }
+
+  void resetGame() {
+    _hasWon = false;
+    _firstFlippedCard = null;
+    _isCheckingMatch = false;
+    _initializeCards();
+    notifyListeners();
   }
 }
 
@@ -129,17 +148,45 @@ class GameScreen extends StatelessWidget {
         padding: const EdgeInsets.all(8.0),
         child: Consumer<GameProvider>(
           builder: (context, gameProvider, child) {
-            return GridView.builder(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4,
-                crossAxisSpacing: 8.0,
-                mainAxisSpacing: 8.0,
-              ),
-              itemCount: gameProvider.cards.length,
-              itemBuilder: (context, index) {
-                final card = gameProvider.cards[index];
-                return CardWidget(card: card);
-              },
+            return Column(
+              children: [
+                Expanded(
+                  child: GridView.builder(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 4,
+                      crossAxisSpacing: 8.0,
+                      mainAxisSpacing: 8.0,
+                    ),
+                    itemCount: gameProvider.cards.length,
+                    itemBuilder: (context, index) {
+                      final card = gameProvider.cards[index];
+                      return CardWidget(card: card);
+                    },
+                  ),
+                ),
+                if (gameProvider.hasWon)
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      children: [
+                        const Text(
+                          'You Won!',
+                          style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green),
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            gameProvider.resetGame();
+                          },
+                          child: const Text('Play Again'),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             );
           },
         ),
